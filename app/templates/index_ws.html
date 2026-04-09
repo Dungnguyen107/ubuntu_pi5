@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pro Engine Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-color: #0b1120;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      /* Màu Neon cho các thông số */
+      --neon-rpm: #38bdf8;     /* Xanh Cyan */
+      --neon-temp: #fb923c;    /* Cam */
+      --neon-load: #a78bfa;    /* Tím */
+      --neon-oil: #facc15;     /* Vàng */
+      --neon-bat: #4ade80;     /* Xanh lá */
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-color);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(167, 139, 250, 0.1) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-weight: 600;
+      font-size: 28px;
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    h1::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background-color: var(--neon-rpm);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--neon-rpm);
+    }
+
+    /* Lưới các thẻ thông số */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+
+    .clickable {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .clickable:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255,255,255,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .card h2 {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .value-box {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .unit {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* Tùy chỉnh màu từng thẻ */
+    #rpmCard .value-box { color: var(--neon-rpm); text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+    #tempCard .value-box { color: var(--neon-temp); text-shadow: 0 0 15px rgba(251, 146, 60, 0.4); }
+    #loadCard .value-box { color: var(--neon-load); text-shadow: 0 0 15px rgba(167, 139, 250, 0.4); }
+    #oilCard .value-box  { color: var(--neon-oil); text-shadow: 0 0 15px rgba(250, 204, 21, 0.4); }
+    #batCard .value-box  { color: var(--neon-bat); text-shadow: 0 0 15px rgba(74, 222, 128, 0.4); }
+
+    .hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 12px;
+      opacity: 0.7;
+    }
+
+    /* Bố cục Log và Control */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Terminal Log */
+    .log-container {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .log-box {
+      flex: 1;
+      height: 300px;
+      overflow-y: auto;
+      background: #000;
+      color: #4ade80; /* Xanh lá hacker */
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px inset rgba(255,255,255,0.1);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--neon-bat); /* Mặc định màu xanh kết nối */
+      box-shadow: 0 0 8px var(--neon-bat);
+    }
+    
+    .status-dot.disconnected {
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
+
+    /* Control Panel */
+    .control-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      color: white;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--neon-rpm);
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: var(--neon-rpm);
+      color: #000;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #7dd3fc;
+      transform: translateY(-1px);
+    }
+
+    /* Nút bấm nhanh cho tương lai */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+    
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fff;
+    }
+
+    /* Modal Biểu đồ */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      padding: 24px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      max-width: 1000px;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .modal-header h2 {
+      font-weight: 600;
+    }
+
+    .btn-close {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .chart-wrap {
+      height: 400px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Trung tâm Giám sát Động cơ</h1>
+
+    <div class="metrics-grid">
+      <div class="card clickable" id="rpmCard">
+        <h2>Tốc độ (RPM)</h2>
+        <div class="value-box">
+          <span id="rpmValue">--</span><span class="unit">rpm</span>
+        </div>
+        <div class="hint">Click để xem biểu đồ</div>
+      </div>
+
+      <div class="card clickable" id="tempCard">
+        <h2>Nhiệt độ nước</h2>
+        <div class="value-box">
+          <span id="tempValue">--</span><span class="unit">°C</span>
+        </div>
+        <div class="hint">Click để xem biểu đồ</div>
+      </div>
+
+      <div class="card">
+        <h2>Tải động cơ</h2>
+        <div class="value-box">
+          <span id="loadValue">--</span><span class="unit">%</span>
+        </div>
+        <div class="hint">Chờ dữ liệu server...</div>
+      </div>
+
+      <div class="card">
+        <h2>Áp suất dầu</h2>
+        <div class="value-box">
+          <span id="oilValue">--</span><span class="unit">bar</span>
+        </div>
+        <div class="hint">Chờ dữ liệu server...</div>
+      </div>
+
+      <div class="card">
+        <h2>Điện áp bình</h2>
+        <div class="value-box">
+          <span id="batValue">--</span><span class="unit">V</span>
+        </div>
+        <div class="hint">Chờ dữ liệu server...</div>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="card log-container">
+        <h2>Giao tiếp UART / WebSocket</h2>
+        <div style="height: 12px;"></div>
+        <div id="logBox" class="log-box"></div>
+        <div class="status">
+          <div id="statusDot" class="status-dot"></div>
+          <span id="status">Đang kết nối...</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Bảng điều khiển (Pi 5)</h2>
+        <div class="hint">Gửi lệnh thô xuống vi điều khiển</div>
+        <div class="control-row">
+          <input id="cmdInput" type="text" placeholder="VD: SET_RPM 1500" autocomplete="off" />
+          <button id="sendBtn">GỬI</button>
+        </div>
+
+        <div class="quick-actions">
+          <button class="btn-action" onclick="document.getElementById('cmdInput').value='START';">BẬT MÁY</button>
+          <button class="btn-action btn-danger" onclick="document.getElementById('cmdInput').value='STOP';">TẮT KHẨN</button>
+          <button class="btn-action" onclick="document.getElementById('cmdInput').value='MODE ECO';">CHẾ ĐỘ ECO</button>
+          <button class="btn-action" onclick="document.getElementById('cmdInput').value='MODE SPORT';">CHẾ ĐỘ SPORT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="chartModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="chartTitle">Biểu đồ</h2>
+        <button id="closeModalBtn" class="btn-close">Đóng</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="historyChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DOM Elements
+    const rpmValue = document.getElementById("rpmValue");
+    const tempValue = document.getElementById("tempValue");
+    const loadValue = document.getElementById("loadValue");
+    const oilValue = document.getElementById("oilValue");
+    const batValue = document.getElementById("batValue");
+    
+    const logBox = document.getElementById("logBox");
+    const statusText = document.getElementById("status");
+    const statusDot = document.getElementById("statusDot");
+    const cmdInput = document.getElementById("cmdInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    const rpmCard = document.getElementById("rpmCard");
+    const tempCard = document.getElementById("tempCard");
+
+    const chartModal = document.getElementById("chartModal");
+    const chartTitle = document.getElementById("chartTitle");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+
+    // Thay đổi màu mặc định của Chart.js cho Dark Mode
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    let ws = null;
+
+    let snapshotHistory = [];
+    let chart = null;
+    let currentChartMode = null;
+
+    function addLog(text) {
+      const now = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+      logBox.textContent += `[${now}] ${text}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function formatTs(ts) {
+      return new Date(ts * 1000).toLocaleTimeString('vi-VN', { hour12: false });
+    }
+
+    function updateCurrentValuesFromSnapshots() {
+      if (!snapshotHistory.length) return;
+
+      const last = snapshotHistory[snapshotHistory.length - 1];
+      rpmValue.textContent = last.rpm ?? "--";
+      tempValue.textContent = last.temp ?? "--";
+      
+      // Update các giá trị mới (nếu server gửi về, nếu không vẫn hiện --)
+      loadValue.textContent = last.load !== undefined ? last.load : "--";
+      oilValue.textContent = last.oil !== undefined ? last.oil : "--";
+      batValue.textContent = last.bat !== undefined ? last.bat : "--";
+    }
+
+    function mergeSnapshots(items) {
+      if (!Array.isArray(items) || !items.length) return;
+
+      for (const item of items) {
+        if (item && item.type === "snapshot" && typeof item.ts === "number") {
+          snapshotHistory.push(item);
+        }
+      }
+
+      // Giữ 500 điểm gần nhất
+      if (snapshotHistory.length > 500) {
+        snapshotHistory = snapshotHistory.slice(-500);
+      }
+
+      updateCurrentValuesFromSnapshots();
+      updateChart();
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch("/history", { cache: "no-store" });
+        const data = await res.json();
+
+        snapshotHistory = Array.isArray(data.snapshots) ? data.snapshots.slice(-500) : [];
+        updateCurrentValuesFromSnapshots();
+        updateChart();
+      } catch (err) {
+        addLog("WARN: Không tải được lịch sử ban đầu từ server.");
+      }
+    }
+
+    function getChartData(mode) {
+      const labels = snapshotHistory.map(item => formatTs(item.ts));
+      const values = snapshotHistory.map(item => mode === "rpm" ? item.rpm : item.temp);
+      return { labels, values };
+    }
+
+    function createChart(mode) {
+      const canvas = document.getElementById("historyChart");
+      const ctx = canvas.getContext("2d");
+
+      const { labels, values } = getChartData(mode);
+      
+      // Chọn màu line dựa vào mode
+      const lineColor = mode === "rpm" ? '#38bdf8' : '#fb923c';
+      const bgColor = mode === "rpm" ? 'rgba(56, 189, 248, 0.1)' : 'rgba(251, 146, 60, 0.1)';
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: mode === "rpm" ? "RPM" : "Nhiệt độ (°C)",
+            data: values,
+            tension: 0.3, // Đường cong mượt
+            borderColor: lineColor,
+            backgroundColor: bgColor,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          scales: {
+            x: {
+              ticks: { maxTicksLimit: 8 },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: mode === "rpm"
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+
+      currentChartMode = mode;
+      chartTitle.textContent = mode === "rpm" 
+        ? "Biến thiên Tốc độ động cơ (RPM)" 
+        : "Biến thiên Nhiệt độ nước làm mát";
+    }
+
+    function updateChart() {
+      if (!chart || !currentChartMode) return;
+      const { labels, values } = getChartData(currentChartMode);
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.update();
+    }
+
+    async function openChart(mode) {
+      currentChartMode = mode;
+      chartModal.classList.add("show");
+
+      // Nếu cần có thể bật lại dòng dưới để force fetch history mỗi lần mở chart
+      // await loadHistory(); 
+
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      createChart(mode);
+    }
+
+    function closeChart() {
+      chartModal.classList.remove("show");
+    }
+
+    // Sự kiện mở/đóng Modal
+    rpmCard.addEventListener("click", () => openChart("rpm"));
+    tempCard.addEventListener("click", () => openChart("temp"));
+    closeModalBtn.addEventListener("click", closeChart);
+    chartModal.addEventListener("click", (e) => {
+      if (e.target === chartModal) closeChart();
+    });
+
+    // Cấu hình WebSocket
+    function connectWS() {
+      ws = new WebSocket(`${protocol}://${location.host}/ws`);
+
+      ws.onopen = () => {
+        statusText.textContent = "Đã kết nối luồng dữ liệu";
+        statusDot.classList.remove("disconnected");
+        addLog("SYSTEM: Khởi tạo kết nối WebSocket thành công.");
+      };
+
+      ws.onclose = () => {
+        statusText.textContent = "Mất kết nối - Đang thử lại...";
+        statusDot.classList.add("disconnected");
+        addLog("SYSTEM: Mất kết nối. Thử lại sau 2 giây...");
+        setTimeout(connectWS, 2000);
+      };
+
+      ws.onerror = () => {
+        addLog("ERROR: Lỗi luồng WebSocket.");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+
+          if (msg.type === "hello") {
+            addLog(`SERVER: ${msg.text || "Connected"}`);
+          }
+          else if (msg.type === "history") {
+            if (Array.isArray(msg.snapshots)) {
+              snapshotHistory = msg.snapshots.slice(-500);
+              updateCurrentValuesFromSnapshots();
+              updateChart();
+            }
+            addLog(`SYSTEM: Đã đồng bộ ${snapshotHistory.length} bản ghi lịch sử.`);
+          }
+          else if (msg.type === "snapshot") {
+            mergeSnapshots([msg]);
+            // Format log cho gọn
+            let logStr = `DATA: RPM=${msg.rpm}, TEMP=${msg.temp}`;
+            if(msg.load !== undefined) logStr += `, LOAD=${msg.load}%`;
+            addLog(logStr);
+          }
+          else if (msg.type === "telemetry") {
+            addLog(`UART >> ${msg.raw}`);
+          }
+          else if (msg.type === "log") {
+            addLog(`LOG >> ${msg.raw}`);
+          }
+          else if (msg.type === "ack") {
+            addLog(`ACK << ${msg.text}`);
+          }
+          else {
+            addLog(`UNKNOWN: ${event.data}`);
+          }
+        } catch (err) {
+          addLog(`RAW DATA: ${event.data}`);
+        }
+      };
+    }
+
+    function sendCommand() {
+      const text = cmdInput.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
+        if (!text) addLog("Lỗi: Vui lòng nhập lệnh.");
+        else addLog("Lỗi: Mạng chưa sẵn sàng để gửi.");
+        return;
+      }
+
+      ws.send(text);
+      addLog(`COMMAND TX >> ${text}`);
+      cmdInput.value = "";
+    }
+
+    sendBtn.addEventListener("click", sendCommand);
+    cmdInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendCommand();
+    });
+
+    // Khởi động
+    loadHistory();
+    connectWS();
+  </script>
+</body>
+</html>
