@@ -9,6 +9,7 @@
  * Build:  gcc uart_reader.c -o uart_reader
  * Run:    ./uart_reader /dev/ttyUSB0 115200
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,7 @@
 #include <termios.h>
 #include <time.h>
 #include <signal.h>
+
 /* ─── Cấu hình ─────────────────────────────────────────────── */
 #define DEFAULT_PORT     "/dev/ttyUSB0"
 #define DEFAULT_BAUDRATE 115200
@@ -80,25 +82,27 @@ int uart_open(const char *port, int baudrate) {
         return -1;
     }
 
+    /* Bước 1: Reset toàn bộ về raw mode TRƯỚC
+     * cfmakeraw() clear tất cả flag xử lý ký tự (echo, signals,
+     * CR/LF conversion...) — tương đương stty raw               */
+    cfmakeraw(&tty);
+
+    /* Bước 2: Config 8N1, no flow control */
+    tty.c_cflag &= ~CSIZE;    /* Clear data bit mask */
+    tty.c_cflag |=  CS8;      /* 8 data bits */
+    tty.c_cflag &= ~PARENB;   /* Không parity */
+    tty.c_cflag &= ~CSTOPB;   /* 1 stop bit */
+    tty.c_cflag &= ~CRTSCTS;  /* Không hardware flow control */
+    tty.c_cflag |=  CLOCAL | CREAD;
+
+    /* Bước 3: Set baudrate SAU khi đã config xong c_cflag
+     * Thứ tự này quan trọng — trên một số kernel cfsetispeed
+     * lưu vào c_cflag, nếu set trước rồi modify c_cflag sẽ mất */
     speed_t speed = get_baudrate(baudrate);
     cfsetispeed(&tty, speed);
     cfsetospeed(&tty, speed);
 
-    /* 8N1 - không dùng flow control */
-    tty.c_cflag  =  (tty.c_cflag & ~CSIZE) | CS8; /* 8 data bits */
-    tty.c_cflag &= ~PARENB;                        /* Không parity */
-    tty.c_cflag &= ~CSTOPB;                        /* 1 stop bit */
-    tty.c_cflag &= ~CRTSCTS;                       /* Không hardware flow */
-    tty.c_cflag |=  CLOCAL | CREAD;                /* Bật nhận */
-
-    tty.c_iflag &= ~(IXON | IXOFF | IXANY);        /* Không software flow */
-    tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK |
-                     ISTRIP | INLCR | IGNCR | ICRNL);
-
-    tty.c_lflag  = 0;                               /* Raw mode */
-    tty.c_oflag  = 0;
-
-    /* Timeout: đọc block tối đa 1s nếu không có data */
+    /* Bước 4: Timeout — block tối đa 1s nếu không có data */
     tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = 10; /* 10 × 0.1s = 1 giây */
 
