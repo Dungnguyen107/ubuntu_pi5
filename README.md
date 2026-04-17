@@ -53,7 +53,7 @@ git clone https://github.com/Dungnguyen107/ubuntu_pi5.git
 - **TẠO VENV VÀ KÍCH HOẠT VENV** (rất dễ lỗi, xem chi tiết trong phần hướng dẫn và file test cam).
 ```bash
 python3 -m venv .venv --system-site-packages
-source ~/camera_test/.venv/bin/activate
+source .venv/bin/activate
 ```
 
 - **CÀI CÁC THƯ VIỆN QUAN TRỌNG NHƯ LIBCAMERA, PICAMERA 2 THEO FILE TEST CAM**
