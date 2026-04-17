@@ -56,6 +56,7 @@ python3 -m venv .venv --system-site-packages
 source .venv/bin/activate
 pip install --upgrade pip
 pip install picamera2
+echo "/usr/local/lib/python3/dist-packages" > ~/Documents/ubuntu_pi5/.venv/lib/python3.12/site-packages/libcamera.pth 
 ```
 
 - **CÀI CÁC THƯ VIỆN QUAN TRỌNG NHƯ LIBCAMERA, PICAMERA 2 THEO FILE TEST CAM**
