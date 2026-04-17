@@ -52,7 +52,7 @@ display_auto_detect=1
 ```
 **NHỚ REBOOT**
 ```bash
-sudo rebot
+sudo reboot
  ```
 
 # Bước 5 - Build  RPi libcamera fork từ source
