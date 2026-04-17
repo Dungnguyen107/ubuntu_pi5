@@ -60,7 +60,19 @@ echo "/usr/local/lib/python3/dist-packages" > ~/Documents/ubuntu_pi5/.venv/lib/p
 ```
 
 - **CÀI CÁC THƯ VIỆN QUAN TRỌNG NHƯ LIBCAMERA, PICAMERA 2 THEO FILE TEST CAM**
+```bash
+cat > ~/Documents/ubuntu_pi5/.venv/lib/python3.12/site-packages/picamera2/previews/__init__.py << 'EOF'
+try:
+    from .drm_preview import DrmPreview
+except Exception:
+    class DrmPreview:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("DrmPreview không khả dụng (thiếu pykms)")
 
+from .null_preview import NullPreview
+from .qt_previews import QtGlPreview, QtPreview
+EOF
+```
 - Cài các thư viện cần thiết theo requirements.txt
 ```bash
 pip install -r requirements.txt
